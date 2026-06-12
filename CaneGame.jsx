@@ -229,13 +229,34 @@ const advance = (g, dt) => {
   return [{ planted, standing, binStock, millQueue, sugar }, earned];
 };
 
+const SAVE_KEY = "cane-v1";
+const loadSave = () => {
+  try {
+    const raw = localStorage.getItem(SAVE_KEY);
+    if (!raw) return null;
+    const s = JSON.parse(raw);
+    // merge over a fresh newGame so missing keys always have defaults
+    return { ...newGame(s.shares ?? 0, s.lifetimeAll ?? 0, s.resets ?? 0), ...s, lastTick: Date.now() };
+  } catch { return null; }
+};
+const writeSave = (g) => {
+  try { localStorage.setItem(SAVE_KEY, JSON.stringify(g)); } catch {}
+};
+
 export default function CaneGame() {
-  const [game, setGame] = useState(() => newGame());
+  const [game, setGame] = useState(() => loadSave() ?? newGame());
   const [tab, setTab] = useState("farm");
   const [incomeRate, setIncomeRate] = useState(0); // $/s, smoothed
   const [awayReport, setAwayReport] = useState(null); // { secs, earned }
   const [tickerIdx, setTickerIdx] = useState(0);
   const rateRef = useRef(0);
+  const saveTimerRef = useRef(null);
+
+  // autosave — debounced 3s so we don't hammer storage every frame
+  useEffect(() => {
+    clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => writeSave(game), 3000);
+  }, [game]);
 
   // single game loop
   useEffect(() => {
